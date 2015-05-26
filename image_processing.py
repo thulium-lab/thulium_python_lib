@@ -128,33 +128,39 @@ def load_data(do_fit2D = False):
     import os, re
     dirs = [dr for dr in os.listdir(os.getcwd()) if re.match(r'[-+]?[0-9.]+ms',dr)]
     all_data = []
-    w1 = FloatProgress(min=0, max=len(dirs),value=0)
-    w1.description='Loading in progress...'
-    display(w1)
+    w = FloatProgress(min=0, max=len(dirs),value=0)
+    w.description='Loading in progress...'
+    display(w)
     for dr in dirs:
-        w1.value += 1
+        w.value += 1
         files = [os.path.join(dr,fl) for fl in os.listdir(dr) if re.match(r'.*_\d+.png',fl)]
         for url in files:
             new_im = Image_Load(url, do_fit2D)
             if new_im.isgood:
                 all_data.append(new_im)
-    w1.bar_style='success'
-    w1.description = 'Loading Done'
+    w.bar_style='success'
+    w.description = 'Loading Done'
     print('Total number of images: ', len(all_data))
+    return all_data
+
+
+# In[ ]:
+
+def rearrange_data(all_data):
     dataD = dict()
-    w2 = FloatProgress(min=0, max=len(all_data),value=0)
-    w2.description='Rearranging in progress...'
-    display(w2)
+    w = FloatProgress(min=0, max=len(all_data),value=0)
+    w.description='Rearranging in progress...'
+    display(w)
     for elem in all_data:
-        w2.value +=1
+        w.value +=1
         if elem.folderN not in dataD:
             dataD[elem.folderN] = dict()
         d = dataD[elem.folderN]
         if elem.shot_typeN not in d:
             d[elem.shot_typeN] = []
         d[elem.shot_typeN].append(elem)
-    w2.bar_style='success'
-    w2.description = 'Rearranging Done'
+    w.bar_style='success'
+    w.description = 'Rearranging Done'
     print('Rearranging to dictionary is complited')
     return dataD
 
@@ -179,7 +185,8 @@ def average_data(dataD, do_fit2D=True):
         avr_dataD[folderN] = dict()
         temp_dict = avr_dataD[folderN]
         for shot_typeN, shot_list in folder_dict.items():
-            temp_dict[shot_typeN] = Avr_inf(shot_list, do_fit2D)
+            if shot_list != []:
+                temp_dict[shot_typeN] = Avr_inf(shot_list, do_fit2D)
     w.bar_style='success'
     w.description = 'Averaging Done'
     print('Averaging is complited')
@@ -209,6 +216,8 @@ def constract_data(dictionary, shot_typeN, attribute, index = None):
     y_data = array([])
     import collections
     for folderN, f_dict in dictionary.items():
+        if f_dict == {}:
+            continue
         if isinstance(f_dict[shot_typeN], collections.Iterable):
             temp_arr = [get_value(elem, attribute, index) for elem in f_dict[shot_typeN]]
         else:
@@ -229,10 +238,11 @@ def sift(dataD, confidence_interval = 0.1):
     for folderN, folder_dict in dataD.items():
         w.value += 1
         for shot_typeN, shot_list in folder_dict.items():
+            #print(folderN, shot_typeN)
             avr_inf = Avr_inf(shot_list, do_fit2D=False)
             to_remove = []
             for elem in shot_list:
-                if abs(elem.x_data_fit[1]-avr_inf.x_data_fit[1])/avr_inf.x_data_fit[1] > confidence_interval and                     abs(elem.y_data_fit[1]-avr_inf.y_data_fit[1])/avr_inf.y_data_fit[1] > confidence_interval:
+                if abs(elem.x_data_fit[1]-avr_inf.x_data_fit[1])/avr_inf.x_data_fit[1] > confidence_interval or                     abs(elem.y_data_fit[1]-avr_inf.y_data_fit[1])/avr_inf.y_data_fit[1] > confidence_interval:
                         to_remove.append(elem)
             for elem in to_remove:
                 print('remove element',shot_list.index(elem), elem.image_url )
@@ -247,10 +257,17 @@ def normalise_avr_image(dictionary, signal_shot, calibration_shot, attribute, in
     """normalize image from evarage dictionary using attribute[index] value - usually 'total' or 'x_data_fit[0]'
         returns constracted dictionary (like what returns 'average_data()' function"""
     norm_data = dict()
+    w = FloatProgress(min=0, max=len(dictionary),value=0)
+    w.description='Normalizing in progress...'
+    display(w)
     for folderN, f_dict in dictionary.items():
+        w.value += 1
         norm_data[folderN] = dict()
         norm_data[folderN][signal_shot] = Image_Fitted(f_dict[signal_shot].mimage / 
                                           get_value(f_dict[calibration_shot],attribute,index),do_fit2D)
+    w.bar_style='success'
+    w.description = 'Normalizing Done'
+    print('Normalization is complited')
     return norm_data
 
 
@@ -260,7 +277,11 @@ def normalise_individual_image(dictionary, signal_shot, calibration_shot, attrib
     """normalize each image using attribute[index] value - usually 'total' or 'x_data_fit[0]'
         returns constracted dictionary (like what returns 'load_data()' function"""
     norm_data = dict()
+    w = FloatProgress(min=0, max=len(dictionary),value=0)
+    w.description='Normalizing in progress...'
+    display(w)
     for folderN, f_dict in dictionary.items():
+        w.value += 1
         calibrated_images = []
         for s_elem in f_dict[signal_shot]:
             c_elems = [c_elem for c_elem in f_dict[calibration_shot] if c_elem.shotN == s_elem.shotN]
@@ -272,5 +293,31 @@ def normalise_individual_image(dictionary, signal_shot, calibration_shot, attrib
         if calibrated_images != []:
             norm_data[folderN] = dict()
             norm_data[folderN][signal_shot] = calibrated_images
+    w.bar_style='success'
+    w.description = 'Normalizing Done'
+    print('Normalization is complited')
     return norm_data
+
+
+# In[ ]:
+
+class N_atoms:
+  """
+  Natoms = N_atoms(gain, exp, power, width, delta) - создать объект класса
+  Natoms(signal) - считает число атомов. по сути в этом месте просто умножение на число
+  signal - параметр фита
+  [exposure]=us
+  [power]=mW
+  [width]=mm
+  [delta]=MHz
+  [gamma]=MHz
+  [angle]=1
+  """
+  def __init__(self, gain=100, exposure=300, power=2.7, width=2.27, delta = 0, gamma = 10, angle = 1./225, Isat = 0.18, hw = 6.6*3/0.41*10**(-11)):
+    self.s = 2*power/3.141592654/width**2/Isat
+    self.rho = self.s/2/(1+self.s+(2*delta/gamma)**2)
+    self.p = 9.69*0.001/100/exposure/2.718281828**(3.85/1000*gain)/gamma/hw/angle/self.rho
+  
+  def __call__(self, signal):
+    return signal*self.p
 
