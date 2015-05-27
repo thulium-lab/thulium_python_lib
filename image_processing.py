@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[ ]:
 
 #%pylab inline
 from IPython.html.widgets import FloatProgress
@@ -9,7 +9,7 @@ from IPython.display import display
 from numpy import *
 
 
-# In[2]:
+# In[ ]:
 
 def gaussian(x,N,x0,sigma, background):
     """Returns value of a 1D-gaussian with the given parameters"""
@@ -25,7 +25,7 @@ def gaussian2D(N, x0, y0, sigma_x, sigma_y, background):
                         -(((x - x0) / sigma_x)**2 + ((y - y0) / sigma_y)**2) / 2) + background
 
 
-# In[3]:
+# In[ ]:
 
 class Image_Basics():
     """Basic image processing, with only center determination and background substructing. 
@@ -47,7 +47,7 @@ class Image_Basics():
         return self.image - tile(av[:,newaxis],self.image.shape[1])
 
 
-# In[4]:
+# In[ ]:
 
 class Image_Fitted(Image_Basics):
     """ Ads fitting functionality, namle 1D and 2D gauss fit
@@ -56,7 +56,7 @@ class Image_Fitted(Image_Basics):
         y_data_fit = [total, y0, sigma_y, background]
         fit2D = [total, y0, x0, sigma_y, sigma_x, background]"""
     def __init__(self, image, do_fit2D, do_filtering=False):
-        from scipy.ndimage import gaussian_filter
+        from scipy.ndimage import gaussian_filter, median_filter
         Image_Basics.__init__(self,image)
         if do_filtering:
             self.mimage = gaussian_filter(self.mimage,1)
@@ -88,7 +88,7 @@ class Image_Fitted(Image_Basics):
         return p
 
 
-# In[5]:
+# In[ ]:
 
 class Image_Load(Image_Fitted):
     """ Loads image using relative path, based on Image_Fitted"""
@@ -100,7 +100,7 @@ class Image_Load(Image_Fitted):
         (self.folderN, self.shotN, self.shot_typeN) = map(float, findall(r"[-+]?\d*\.\d+|\d+", self.image_url))
 
 
-# In[6]:
+# In[ ]:
 
 class Avr_inf(Image_Fitted):
     """ Class for average data, has all attributes as Image_Fitted instance for average image as well as average
@@ -117,7 +117,7 @@ class Avr_inf(Image_Fitted):
             self.each_fit2D = mean([d.fit2D for d in shot_list],0)
 
 
-# In[7]:
+# In[ ]:
 
 def load_data(do_fit2D = False, do_filtering=False):
     """Loads all data initially to all_data (unsorted list), and then to dictionary structure dataD
@@ -168,7 +168,7 @@ def rearrange_data(all_data):
     return dataD
 
 
-# In[8]:
+# In[ ]:
 
 def average_data(dataD, do_fit2D=True):
     """Averages data from dataD to dictionary structure avr_dataD
@@ -206,7 +206,7 @@ def get_value(obj, attribute, index):
         return getattr(obj,attribute)
 
 
-# In[9]:
+# In[ ]:
 
 def constract_data(dictionary, shot_typeN, attribute, index = None):
     """The most usefull tool. Returns x_data and y_data list already suitable for plotting (i.e. with the same length)
