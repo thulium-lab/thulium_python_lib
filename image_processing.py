@@ -55,8 +55,11 @@ class Image_Fitted(Image_Basics):
         x_data_fit = [total, x0, sigma_x, background]
         y_data_fit = [total, y0, sigma_y, background]
         fit2D = [total, y0, x0, sigma_y, sigma_x, background]"""
-    def __init__(self, image, do_fit2D):
+    def __init__(self, image, do_fit2D, do_filtering=False):
+        from scipy.ndimage import gaussian_filter
         Image_Basics.__init__(self,image)
+        if do_filtering:
+            self.mimage = gaussian_filter(self.mimage,1)
         try:
             self.do_fit(do_fit2D)
             self.center_pos = (self.x_data_fit[1], self.y_data_fit[1])
@@ -89,11 +92,11 @@ class Image_Fitted(Image_Basics):
 
 class Image_Load(Image_Fitted):
     """ Loads image using relative path, based on Image_Fitted"""
-    def __init__(self,image_url, do_fit2D=False):
+    def __init__(self,image_url, do_fit2D=False, do_filtering=False):
         from matplotlib.pyplot import imread
         from re import findall
         self.image_url = image_url
-        Image_Fitted.__init__(self, imread(image_url), do_fit2D)
+        Image_Fitted.__init__(self, imread(image_url), do_fit2D, do_filtering)
         (self.folderN, self.shotN, self.shot_typeN) = map(float, findall(r"[-+]?\d*\.\d+|\d+", self.image_url))
 
 
@@ -116,7 +119,7 @@ class Avr_inf(Image_Fitted):
 
 # In[7]:
 
-def load_data(do_fit2D = False):
+def load_data(do_fit2D = False, do_filtering=False):
     """Loads all data initially to all_data (unsorted list), and then to dictionary structure dataD
     folderN1  ----    shot_typeN1   ----  [list of Image_Load instances]
                       shot_typeN2   ----  [list of Image_Load instances]
@@ -135,7 +138,7 @@ def load_data(do_fit2D = False):
         w.value += 1
         files = [os.path.join(dr,fl) for fl in os.listdir(dr) if re.match(r'.*_\d+.png',fl)]
         for url in files:
-            new_im = Image_Load(url, do_fit2D)
+            new_im = Image_Load(url, do_fit2D, do_filtering)
             if new_im.isgood:
                 all_data.append(new_im)
     w.bar_style='success'
@@ -320,4 +323,10 @@ class N_atoms:
   
   def __call__(self, signal):
     return signal*self.p
+
+
+# In[ ]:
+
+def real_size(x, binning=2, pixel_size = 22.3/4):
+    return x * binning * pixel_size
 
