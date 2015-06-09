@@ -331,3 +331,14 @@ class N_atoms:
 def real_size(x, binning=2, pixel_size = 22.3/4):
     return x * binning * pixel_size
 
+
+# In[ ]:
+
+def drop_data(data_lists, points):
+    """ Drop points from all lists in data_list, mask is constracted using first list in data_lists"""
+    mask = array([not(x in points) for x in data_lists[0]])
+    res = []
+    for data_list in data_lists:
+        list.append(res,data_list[mask])
+    return res
+
