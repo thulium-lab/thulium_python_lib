@@ -98,7 +98,7 @@ class Image_Load(Image_Fitted):
         from re import findall
         self.image_url = image_url
         Image_Fitted.__init__(self, imread(image_url), do_fit2D, do_filtering)
-        (self.folderN, self.shotN, self.shot_typeN) = map(float, findall(r"[-+]?\d*\.\d+|\d+", self.image_url))
+        (self.folderN, self.shotN, self.shot_typeN) = map(float, findall(r"[-+]?\d*\.\d+|\d+", self.image_url)[-3:])
 
 
 # In[ ]:
@@ -120,8 +120,8 @@ class Avr_inf(Image_Fitted):
 
 # In[ ]:
 
-def load_data(do_fit2D = False, do_filtering=False):
-    """Loads all data initially to all_data (unsorted list), and then to dictionary structure dataD
+def load_data(directory, do_fit2D = False, do_filtering=False):
+    """Loads all data from 'directory' initially to all_data (unsorted list), and then to dictionary structure dataD
     folderN1  ----    shot_typeN1   ----  [list of Image_Load instances]
                       shot_typeN2   ----  [list of Image_Load instances]
                      ....
@@ -130,7 +130,7 @@ def load_data(do_fit2D = False, do_filtering=False):
                      ....
     By default does not fit each image 2D-gauss"""
     import os, re
-    dirs = [dr for dr in os.listdir(os.getcwd()) if re.match(r'[-+]?[0-9.]+ms',dr)]
+    dirs = [os.path.join(directory,dr) for dr in os.listdir(directory) if re.match(r'[-+]?[0-9.]+ms',dr)]
     all_data = []
     w = FloatProgress(min=0, max=len(dirs),value=0)
     w.description='Loading in progress...'
