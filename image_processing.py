@@ -144,8 +144,24 @@ def load_data(directory, do_fit2D = False, do_filtering=False):
                 all_data.append(new_im)
     w.bar_style='success'
     w.description = 'Loading Done'
+#     from operator import concat
+#     from functools import reduce
+#     all_data = reduce(concat,map(single_directory_load, dirs ,[do_fit2D]*len(dirs), [do_filtering]*len(dirs)))
     print('Total number of images: ', len(all_data))
     return all_data
+
+
+# In[ ]:
+
+def single_directory_load(dr, do_fit2D, do_filtering):
+    import os, re
+    files = [os.path.join(dr,fl) for fl in os.listdir(dr) if re.match(r'.*_\d+.png',fl)]
+    temp_arr = []
+    for url in files:
+        new_im = Image_Load(url, do_fit2D, do_filtering)
+        if new_im.isgood:
+            temp_arr.append(new_im)
+    return temp_arr
 
 
 # In[ ]:
@@ -195,6 +211,17 @@ def average_data(dataD, do_fit2D=True):
     w.description = 'Averaging Done'
     print('Averaging is complited')
     return avr_dataD
+
+
+# In[ ]:
+
+def single_directory_average(d_tuple,do_fit2D):
+    folderN, folder_dict = d_tuple
+    temp_dict = dict()
+    for shot_typeN, shot_list in folder_dict.items():
+        if shot_list != []:
+            temp_dict[shot_typeN] = Avr_inf(shot_list, do_fit2D)
+    return folderN, temp_dict
 
 
 # In[ ]:
@@ -341,4 +368,12 @@ def drop_data(data_lists, points):
     for data_list in data_lists:
         list.append(res,data_list[mask])
     return res
+
+
+# In[ ]:
+
+def data2_sort(x,y):
+    """ Sort both array x and y using x-array as criteria"""
+    res = array(sorted(zip(x,y), key=lambda x: x[0]))
+    return res[:,0],res[:,1]
 
