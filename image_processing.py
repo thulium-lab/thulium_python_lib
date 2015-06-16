@@ -6,6 +6,7 @@
 #%pylab inline
 from IPython.html.widgets import FloatProgress
 from IPython.display import display
+from matplotlib.cbook import flatten
 from numpy import *
 
 
@@ -38,8 +39,8 @@ class Image_Basics():
         self.image = image
         c_pos = self.image.argmax()
         self.center_pos = (c_pos//self.image.shape[1], c_pos%self.image.shape[1])
-        self.mimage = self.bgd_substract()
-        self.total = sum(self.mimage)
+        self.image = self.bgd_substract()
+        self.total = sum(self.image)
         self.isgood = True
     def bgd_substract(self, slice_to_c = (-20,-1)):
         """ Substracts background, which is calculated using vertical strip at right side"""
@@ -60,7 +61,7 @@ class Image_Fitted(Image_Basics):
         from scipy.ndimage import gaussian_filter, median_filter
         Image_Basics.__init__(self,image)
         if do_filtering:
-            self.mimage = gaussian_filter(self.mimage,1)
+            self.image = gaussian_filter(self.image,1)
         try:
             self.do_fit(do_fit2D)
             self.center_pos = (self.x_data_fit[1], self.y_data_fit[1])
@@ -70,8 +71,8 @@ class Image_Fitted(Image_Basics):
     def do_fit(self, do_fit2D, width=10):
         """ Does fits"""
         from scipy.optimize import curve_fit
-        x_data = sum(self.mimage,0)
-        y_data = sum(self.mimage,1)
+        x_data = sum(self.image,0)
+        y_data = sum(self.image,1)
         popt_x, pcov_x = curve_fit(gaussian, range(len(x_data)), x_data, p0=(self.total, argmax(x_data), width, 0))
         popt_y, pcov_y = curve_fit(gaussian, range(len(y_data)), y_data, p0=(self.total, argmax(y_data), width, 0))
         self.x_data_fit = popt_x
@@ -111,7 +112,7 @@ class Avr_inf(Image_Fitted):
         each_fit2D = [total, y0, x0, sigma_y, sigma_x, background] if exists
         """
     def __init__(self,shot_list, do_fit2D=True):
-        Image_Fitted.__init__(self,mean([d.mimage for d in shot_list],0), do_fit2D)
+        Image_Fitted.__init__(self,mean([d.image for d in shot_list],0), do_fit2D)
         self.each_x_data_fit = mean([d.x_data_fit for d in shot_list],0)
         self.each_y_data_fit = mean([d.y_data_fit for d in shot_list],0)
         if hasattr(shot_list[0],'fit2D'):
@@ -144,9 +145,7 @@ def load_data(directory, do_fit2D = False, do_filtering=False):
                 all_data.append(new_im)
     w.bar_style='success'
     w.description = 'Loading Done'
-#     from operator import concat
-#     from functools import reduce
-#     all_data = reduce(concat,map(single_directory_load, dirs ,[do_fit2D]*len(dirs), [do_filtering]*len(dirs)))
+#     all_data = list(flatten(map(single_directory_load, dirs ,[do_fit2D]*len(dirs), [do_filtering]*len(dirs))))
     print('Total number of images: ', len(all_data))
     return all_data
 
@@ -154,6 +153,7 @@ def load_data(directory, do_fit2D = False, do_filtering=False):
 # In[ ]:
 
 def single_directory_load(dr, do_fit2D, do_filtering):
+    """Function to use in parallel data load"""
     import os, re
     files = [os.path.join(dr,fl) for fl in os.listdir(dr) if re.match(r'.*_\d+.png',fl)]
     temp_arr = []
@@ -216,6 +216,7 @@ def average_data(dataD, do_fit2D=True):
 # In[ ]:
 
 def single_directory_average(d_tuple,do_fit2D):
+    """Function to use in parallel average"""
     folderN, folder_dict = d_tuple
     temp_dict = dict()
     for shot_typeN, shot_list in folder_dict.items():
@@ -284,6 +285,26 @@ def sift(dataD, confidence_interval = 0.1):
 
 # In[ ]:
 
+def single_directory_sift(d_tuple, confidence_interval):
+    """Function to use in parallel sigting
+    !!! works slower than without parallelism"""
+    folderN, folder_dict = d_tuple
+    temp_dict = dict()
+    for shot_typeN, shot_list in folder_dict.items():
+        #print(folderN, shot_typeN)
+        avr_inf = Avr_inf(shot_list, do_fit2D=False)
+        to_remove = []
+        for elem in shot_list:
+            if abs(elem.x_data_fit[1]-avr_inf.x_data_fit[1])/avr_inf.x_data_fit[1] > confidence_interval or                 abs(elem.y_data_fit[1]-avr_inf.y_data_fit[1])/avr_inf.y_data_fit[1] > confidence_interval:
+                    to_remove.append(elem)
+        for elem in to_remove:
+            print('remove element',shot_list.index(elem), elem.image_url )
+            shot_list.remove(elem)
+    return folderN, folder_dict 
+
+
+# In[ ]:
+
 def normalise_avr_image(dictionary, signal_shot, calibration_shot, attribute, index=None, do_fit2D = True):
     """normalize image from evarage dictionary using attribute[index] value - usually 'total' or 'x_data_fit[0]'
         returns constracted dictionary (like what returns 'average_data()' function"""
@@ -294,7 +315,7 @@ def normalise_avr_image(dictionary, signal_shot, calibration_shot, attribute, in
     for folderN, f_dict in dictionary.items():
         w.value += 1
         norm_data[folderN] = dict()
-        norm_data[folderN][signal_shot] = Image_Fitted(f_dict[signal_shot].mimage / 
+        norm_data[folderN][signal_shot] = Image_Fitted(f_dict[signal_shot].image / 
                                           get_value(f_dict[calibration_shot],attribute,index),do_fit2D)
     w.bar_style='success'
     w.description = 'Normalizing Done'
@@ -320,7 +341,7 @@ def normalise_individual_image(dictionary, signal_shot, calibration_shot, attrib
                 print('s_elem.image_url has no calibration image')
                 continue
             calibrated_images = append(calibrated_images, 
-                                       Image_Fitted(s_elem.mimage / get_value(c_elems[0],attribute,index), do_fit2D))
+                                       Image_Fitted(s_elem.image / get_value(c_elems[0],attribute,index), do_fit2D))
         if calibrated_images != []:
             norm_data[folderN] = dict()
             norm_data[folderN][signal_shot] = calibrated_images
