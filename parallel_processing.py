@@ -9,7 +9,6 @@ import thulium_python_lib.image_processing as imp
 
 # Start claster and load_balance_view
 rc = parallel.Client()
-rc.ids
 lview = rc.load_balanced_view()
 
 with rc[:].sync_imports():
