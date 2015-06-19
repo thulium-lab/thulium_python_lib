@@ -112,9 +112,13 @@ class Avr_inf(Image_Fitted):
         each_fit2D = [total, y0, x0, sigma_y, sigma_x, background] if exists
         """
     def __init__(self,shot_list, do_fit2D=True):
-        Image_Fitted.__init__(self,mean([d.image for d in shot_list],0), do_fit2D)
+        Image_Fitted.__init__(self,mean([d.image for d in shot_list],0), do_fit2D) 
         self.each_x_data_fit = mean([d.x_data_fit for d in shot_list],0)
         self.each_y_data_fit = mean([d.y_data_fit for d in shot_list],0)
+        self.each_total = mean([d.total for d in shot_list],0)
+        self.std_x_data = std([d.x_data_fit for d in shot_list],0)
+        self.std_y_data = std([d.y_data_fit for d in shot_list],0)
+        self.std_total = std([d.total for d in shot_list],0)
         if hasattr(shot_list[0],'fit2D'):
             self.each_fit2D = mean([d.fit2D for d in shot_list],0)
 
