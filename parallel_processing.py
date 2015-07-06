@@ -14,7 +14,8 @@ lview = rc.load_balanced_view()
 with rc[:].sync_imports():
     import sys, os
     
-get_ipython().magic("px if r'D:\\\\!Data' not in sys.path: sys.path.append(r'D:\\\\!Data')")
+#%px if r'D:\\!Data' not in sys.path: sys.path.append(r'D:\\!Data')
+get_ipython().magic("px if r'/Users/artemgolovizin/GitHub' not in sys.path: sys.path.append(r'/Users/artemgolovizin/GitHub')")
 get_ipython().magic('px import thulium_python_lib.image_processing as imp')
 
 
