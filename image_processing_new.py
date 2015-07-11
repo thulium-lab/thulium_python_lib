@@ -31,6 +31,7 @@ def gaussian2D(N, x0, y0, sigma_x, sigma_y, background):
 
 class Image_Basics():
     """Basic image processing, with only center determination and background substructing. 
+        Fits are available and called later.
         isgood parameter is needed for indicating if smth wrong with image during it's processing 
         (i.e. if image is blank)"""
     def __init__(self,image, image_url='not_defined'):
@@ -66,7 +67,11 @@ class Image_Basics():
 # In[ ]:
 
 class Load_Image():
-    """ Loads image using relative path, based on Image_Fitted"""
+    """ Class for loading image. 
+        Parameters are clear, dview - view on remote engins (to run in parallel)
+        To change filter function from default (gaussian_filter), do instance.filter_functions = new_function, it should take
+        only 1 parameter
+        """
     def __init__(self, dview = None, do_fit1D_x=True, do_fit1D_y=True, do_fit2D=False, do_filtering=False):
         from scipy.ndimage import gaussian_filter#, median_filter
         self.do_fit1D_x = do_fit1D_x
@@ -77,6 +82,13 @@ class Load_Image():
         self.filter_param = 1 # for gaussian filtering
         dview['loader'] = self # loader - name of instance to load images
     def load_image(self,image_url):
+        """ Loads individual image and performs fits. If fit wasn't found, isgood flag is set to False
+            If do_filtering is True, filters image
+            Depending on flags, adds follow attribute:
+            fit1Dx = [total, x0, sigma_x, background]
+            fit1Dy = [total, y0, sigma_y, background]
+            fit2D  = [total, y0, x0, sigma_y, sigma_x, background]
+        """
         from matplotlib.pyplot import imread
         from re import findall
         data = Image_Basics(imread(image_url),image_url)
@@ -95,7 +107,9 @@ class Load_Image():
             data.isgood = False
         return data
     def __call__(self,directory,lview = None):
-        print('hi')
+        """ Construct list of image_urls and load them in parallel. Bad images are not filtered out here, only indication
+            by isgood flag
+        """
         import os, re
         dirs = [os.path.join(directory,dr) for dr in os.listdir(directory) if re.match(r'[-+]?[0-9.]+ms',dr)]
         files_to_load = [os.path.join(dr,fl) for dr in dirs for fl in os.listdir(dr) if re.match(r'.*_\d+.png',fl)]
@@ -109,12 +123,34 @@ class Load_Image():
 
 # In[ ]:
 
+def rearrange_data(all_data):
+    """ Rearranges data from flat list to dictionary simultaneously dropping bad images
+    """
+    dataD = dict()
+#     w = FloatProgress(min=0, max=len(all_data),value=0)
+#     w.description='Rearranging in progress...'
+#     display(w)
+    for elem in all_data:
+#         w.value +=1
+        if not elem.isgood:
+            print('Not good ',elem.image_url)
+            continue
+        if elem.folderN not in dataD:
+            dataD[elem.folderN] = dict()
+        d = dataD[elem.folderN]
+        if elem.shot_typeN not in d:
+            d[elem.shot_typeN] = []
+        d[elem.shot_typeN].append(elem)
+#     w.bar_style='success'
+#     w.description = 'Rearranging Done'
+    print('Rearranging to dictionary is complited')
+    return dataD
+
+
+# In[ ]:
+
 class Avr_Image():
-    """ Class for average data, has all attributes as Image_Fitted instance for average image as well as average
-        data from each image:
-        each_x_data_fit = [total, x0, sigma_x, background]
-        each_y_data_fit = [total, y0, sigma_y, background]
-        each_fit2D = [total, y0, x0, sigma_y, sigma_x, background] if exists
+    """ Class for average data, has all attributes as Load_Image
         """
     def __init__(self, dview=None, do_fit1D_x=True, do_fit1D_y=True, do_fit2D=True, do_filtering=False):
         from scipy.ndimage import gaussian_filter#, median_filter
@@ -126,6 +162,9 @@ class Avr_Image():
         self.filter_param = 1 # for gaussian filtering
         dview['averager']=self
     def avr_image(self,folderN, shot_typeN, image_list):
+        """ For average image there are (if) exist everaged data from each image and its standatd deviation:
+        data.total_mean, data.total_std, fit1D_x(y)_mean, fit1D_x(y)_std, data.fit2D_mean, data.fit2D_std
+        If any fit wasn't found avr_image is not added to the dictionary"""
         data = Image_Basics(mean([d.image for d in image_list],0), "folder=%f,shot_typeN=%i"%(folderN,shot_typeN))
         try: 
             if self.do_fit1D_x:
@@ -151,6 +190,8 @@ class Avr_Image():
             data.fit2D_std = std([d.fit2D for d in image_list],0)
         return (folderN, shot_typeN, data)  
     def __call__(self, dataD, lview):
+        """ Construct average image
+        """
         images_to_avr = []
         for folderN, folder_dict in dataD.items():
             for shot_typeN, image_list in folder_dict.items():
@@ -169,63 +210,11 @@ class Avr_Image():
 
 # In[ ]:
 
-def load_data(directory,loader):
-    """Loads all data from 'directory' initially to all_data (unsorted list), and then to dictionary structure dataD
-    folderN1  ----    shot_typeN1   ----  [list of Image_Load instances]
-                      shot_typeN2   ----  [list of Image_Load instances]
-                     ....
-    folderN2  ----    shot_typeN1   ----  [list of Image_Load instances]
-                      shot_typeN2   ----  [list of Image_Load instances]
-                     ....
-    By default does not fit each image 2D-gauss"""
-    import os, re
-    dirs = [os.path.join(directory,dr) for dr in os.listdir(directory) if re.match(r'[-+]?[0-9.]+ms',dr)]
-    files_to_load = [os.path.join(dr,fl) for dr in dirs for fl in os.listdir(dr) if re.match(r'.*_\d+.png',fl)]
-#     all_data = []
-#     w = FloatProgress(min=0, max=len(dirs),value=0)
-#     w.description='Loading in progress...'
-#     display(w)
-#     for dr in dirs:
-#         w.value += 1
-#         files = [os.path.join(dr,fl) for fl in os.listdir(dr) if re.match(r'.*_\d+.png',fl)]
-#         for url in files:
-#             new_im = Image_Load(url, do_fit2D, do_filtering)
-#             if new_im.isgood:
-#                 all_data.append(new_im)
-#     w.bar_style='success'
-#     w.description = 'Loading Done'
-    all_data = list(flatten(map(loader.load_image, files_to_load)))
-    print('Total number of images: ', len(all_data))
-    return all_data
-
-
-# In[ ]:
-
-def rearrange_data(all_data):
-    dataD = dict()
-    w = FloatProgress(min=0, max=len(all_data),value=0)
-    w.description='Rearranging in progress...'
-    display(w)
-    for elem in all_data:
-        w.value +=1
-        if not elem.isgood:
-            print('Not good ',elem.image_url)
-            continue
-        if elem.folderN not in dataD:
-            dataD[elem.folderN] = dict()
-        d = dataD[elem.folderN]
-        if elem.shot_typeN not in d:
-            d[elem.shot_typeN] = []
-        d[elem.shot_typeN].append(elem)
-    w.bar_style='success'
-    w.description = 'Rearranging Done'
-    print('Rearranging to dictionary is complited')
-    return dataD
-
-
-# In[ ]:
-
 def get_avr_data_for_plot(avr_dataD, shot_typeN, norm_func, attribute, index=None): 
+    """ Construct data for plot from avr_dataD dictionary
+        Automaticaly sorts keys and drops a key if there no avr_image for specified shot_typeN
+        Automaticaly normalizes 'y' values using norm_func, and constructs standard deviation error.
+        If this is not needed just do after d_plot['yerr'] = None"""
     d_plot = dict()
     ks = avr_dataD.keys()
     ks_f = []
@@ -236,44 +225,8 @@ def get_avr_data_for_plot(avr_dataD, shot_typeN, norm_func, attribute, index=Non
             print('avr_dataD has no average image for folderN=%i shot_typeN=%i' % (k,shot_typeN))
     d_plot['x'] = array(ks_f)
     d_plot['y'] = norm_func(array([get_value(avr_dataD[xx][shot_typeN],attribute,index) for xx in d_plot['x']]))
-    d_plot['yerr'] = norm_func(array([get_value(avr_dataD[xx][shot_typeN],attribute+'_std',index) for xx in d_plot['x']]))
+    d_plot['yerr'] = norm_func(array([get_value(avr_dataD[xx][shot_typeN],attribute +'_std',index) for xx in d_plot['x']]))
     return d_plot
-
-
-# In[ ]:
-
-def drop_by_number(data, *numbers):
-    for k in data.keys():
-        if data[k]!=None and type(data[k])!=str:
-            data[k] = delete(data[k],numbers)
-
-
-# In[ ]:
-
-def average_data(dataD, do_fit2D=True):
-    """Averages data from dataD to dictionary structure avr_dataD
-    folderN1  ----    shot_typeN1   ----  Avr_inf instances
-                      shot_typeN2   ----  Avr_inf instances
-                     ....
-    folderN2  ----    shot_typeN1   ----  Avr_inf instances
-                      shot_typeN2   ----  Avr_inf instances
-                     ....
-    By default does fit each average image 2D-gauss"""
-    avr_dataD = dict()
-    w = FloatProgress(min=0, max = len(dataD), value=0)
-    w.description='Averaging in progress...'
-    display(w)
-    for folderN, folder_dict in dataD.items():
-        w.value += 1
-        avr_dataD[folderN] = dict()
-        temp_dict = avr_dataD[folderN]
-        for shot_typeN, shot_list in folder_dict.items():
-            if shot_list != []:
-                temp_dict[shot_typeN] = Avr_inf(shot_list, do_fit2D)
-    w.bar_style='success'
-    w.description = 'Averaging Done'
-    print('Averaging is complited')
-    return avr_dataD
 
 
 # In[ ]:
@@ -442,9 +395,19 @@ def drop_data(data_lists, points):
     return res
 
 
+# In[ ]:
+
+def drop_by_number(data, *numbers):
+    """Drops point by its serial number"""
+    for k in data.keys():
+        if data[k]!=None and type(data[k])!=str:
+            data[k] = delete(data[k],numbers)
+
+
 # In[1]:
 
 def drop_by_x(data, *points):
+    """Drops point by its 'x' value"""
     mask = array([not(x in points) for x in data['x']])
     for k in data.keys():
         if data[k]!=None and type(data[k])!=str:
