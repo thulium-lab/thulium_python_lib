@@ -32,7 +32,7 @@ def gaussian2D(N, x0, y0, sigma_x, sigma_y, background):
 class Image_Basics():
     """Basic image processing, with only center determination and background substructing. 
         isgood parameter is needed for indicating if smth wrong with image during it's processing 
-        (i.e. if image is blank)"""
+        (e.g. if image is blank)"""
     def __init__(self,image):
         if not hasattr(self,'image_url'):
             self.image_url = 'derived'
