@@ -225,7 +225,10 @@ def get_avr_data_for_plot(avr_dataD, shot_typeN, norm_func, attribute, index=Non
             print('avr_dataD has no average image for folderN=%i shot_typeN=%i' % (k,shot_typeN))
     d_plot['x'] = array(ks_f)
     d_plot['y'] = norm_func(array([get_value(avr_dataD[xx][shot_typeN],attribute,index) for xx in d_plot['x']]))
-    d_plot['yerr'] = norm_func(array([get_value(avr_dataD[xx][shot_typeN],attribute +'_std',index) for xx in d_plot['x']]))
+    try:
+        d_plot['yerr'] = norm_func(array([get_value(avr_dataD[xx][shot_typeN],attribute +'_std',index) for xx in d_plot['x']]))
+    except AttributeError:
+        d_plot['yerr']=None
     return d_plot
 
 
