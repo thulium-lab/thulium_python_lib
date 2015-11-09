@@ -88,6 +88,8 @@ class Image_Basics():
 
 class Load_Image():
     """ Class for loading image. 
+        Constructor:
+        __init__(self, dview = None, do_fit1D_x=True, do_fit1D_y=True, do_fit2D=False, do_filtering=False)
         Parameters are clear, dview - view on remote engins (to run in parallel)
         To change filter function from default (gaussian_filter), do instance.filter_functions = new_function, it should take
         only 1 parameter
