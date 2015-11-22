@@ -4,8 +4,8 @@
 # In[ ]:
 
 #%pylab inline
-from IPython.html.widgets import FloatProgress
-from IPython.display import display
+#from IPython.html.widgets import FloatProgress
+#from IPython.display import display
 from matplotlib.cbook import flatten
 from numpy import *
 import re
@@ -14,8 +14,11 @@ import json
 
 # In[ ]:
 
+#class for encoding numpy array to json
 class JsonCustomEncoder(json.JSONEncoder):
-    """ <cropped for brevity> """
+    """
+    class for encoding numpy array to json
+    """
     def default(self, obj):
         if isinstance(obj, (ndarray, number)):
             return obj.tolist()
@@ -32,12 +35,12 @@ class JsonCustomEncoder(json.JSONEncoder):
 
 # removed coeffitioent 2 in gaussian functions in exponents
 def gaussian(x,N,x0,sigma, background):
-    """Returns value of a 1D-gaussian with the given parameters"""
+    """Returns value of a 1D-gaussian with the given parameters ,N,x0,sigma, background"""
     #from numpy import sqrt,pi,exp
     return N / (sigma * sqrt(pi)) * exp(-(x - x0)**2/(sigma**2)) + background
 
 def gaussian2D(N, x0, y0, sigma_x, sigma_y, background):
-    """Returns a 2D-gaussian function with the given parameters"""
+    """Returns a 2D-gaussian function with the given parameters x0, y0, sigma_x, sigma_y, background"""
     #from numpy import pi,exp
     sigma_x = float(sigma_x)
     sigma_y = float(sigma_y)
@@ -50,7 +53,7 @@ def gaussian2D(N, x0, y0, sigma_x, sigma_y, background):
 class Image_Basics():
     """Basic image processing, with only center determination and background substructing. 
         Fits are available and called later.
-        isgood parameter is needed for indicating if smth wrong with image during it's processing 
+        isgood parameter is needed for indicating if smth wrong with the image during its processing 
         (i.e. if image is blank)"""
     def __init__(self,image, image_url='not_defined'):
         self.image_url = image_url
@@ -200,9 +203,16 @@ class Avr_Image():
         if self.do_sifting:
             # construct new image list with valid images
             new_image_list = [image for image in image_list if self.check_image(data, image)]
-            image_list = new_image_list
-            # construct new average image from this new list
-            data = Image_Basics(mean([d.image for d in image_list],0), "folder=%f,shot_typeN=%i"%(folderN,shot_typeN))
+#             print("folder=%f,shot_typeN=%i"%(folderN,shot_typeN), len(image_list),len(new_image_list))
+            if len(new_image_list) == 0:
+                print("All images are sifted in" + data.image_url)
+                data.isgood = False
+                return []
+            else:
+                print(len(image_list) - len(new_image_list), 'images are sifted in', data.image_url)
+                image_list = new_image_list
+                # construct new average image from this new list
+                data = Image_Basics(mean([d.image for d in image_list],0), "folder=%f,shot_typeN=%i"%(folderN,shot_typeN))
         try: 
             if self.do_fit1D_x:
                 data.fit1D_x = data.fit_gaussian1D(0)
@@ -284,6 +294,28 @@ def mod_avrData(avr_dataD, folderN_calib,n_atom_calib, lin_dim_calib):
 
 # In[ ]:
 
+def get_avr_data(navrD, shot_typeN, attribute, index=None): 
+    """ Construct data for plot from navrD dictionary
+        Automaticaly sorts keys and drops a key if there no avr_image for specified shot_typeN
+        Automaticaly constructs standard deviation error.
+        If this is not needed just do after d_plot['yerr'] = None"""
+    d_plot = dict()
+    ks = navrD.keys()
+    ks_f = []
+    for k in sorted(ks):
+        if shot_typeN in navrD[k].keys():
+            ks_f.append(k)
+        else:
+            print('navrD has no average image for folderN=%i shot_typeN=%i' % (k,shot_typeN))
+    d_plot['x'] = array(ks_f)
+    d_plot['y'] = array([navrD[xx][shot_typeN][attribute][index] if index != None else navrD[xx][shot_typeN][attribute+'_std'] for xx in d_plot['x']])
+    try:
+        d_plot['yerr'] = array([navrD[xx][shot_typeN][attribute+'_std'][index] if index != None else navrD[xx][shot_typeN][attribute] for xx in d_plot['x']])
+    except AttributeError:
+        d_plot['yerr']=None
+    return d_plot
+
+# old version of above function
 def get_avr_data_for_plot(avr_dataD, shot_typeN, norm_func, attribute, index=None): 
     """ Construct data for plot from avr_dataD dictionary
         Automaticaly sorts keys and drops a key if there no avr_image for specified shot_typeN
@@ -304,10 +336,9 @@ def get_avr_data_for_plot(avr_dataD, shot_typeN, norm_func, attribute, index=Non
     except AttributeError:
         d_plot['yerr']=None
     return d_plot
-
-
 # In[ ]:
 
+#not needed now
 def get_value(obj, attribute, index):
     """retruns obj.attibute[index] or obj.attribute if index is not defined"""
     if index != None:
@@ -318,6 +349,7 @@ def get_value(obj, attribute, index):
 
 # In[ ]:
 
+# used for constracting data from individual images
 def constract_data(dictionary, shot_typeN, attribute, index = None):
     """The most usefull tool. Returns x_data and y_data list already suitable for plotting (i.e. with the same length)
     dictionary - the dictionary to extract data from (i.e. dataD or avr_dataD)
@@ -339,9 +371,7 @@ def constract_data(dictionary, shot_typeN, attribute, index = None):
         x_data = append(x_data, ones(len(temp_arr)) * folderN)
     return x_data, y_data
 
-
-# In[ ]:
-
+# not used now
 def sift(dataD, confidence_interval = 0.1):
     """Sifts (filters) data on empty images by using average information and comperes centers  of 1D gaussian fits.
     If difference is larger the 'confidence_interval' from the average value, the image would be removed from dataD"""
@@ -355,17 +385,14 @@ def sift(dataD, confidence_interval = 0.1):
             avr_inf = Avr_inf(shot_list, do_fit2D=False)
             to_remove = []
             for elem in shot_list:
-                if abs(elem.fit1D_x[1]-avr_inf.fit1D_x[1])/avr_inf.fit1D_x[1] > confidence_interval or                     abs(elem.fit1D_y[1]-avr_inf.fit1D_y[1])/avr_inf.fit1D_y[1] > confidence_interval:
+                if abs(elem.fit1D_x[1]-avr_inf.fit1D_x[1])/avr_inf.fit1D_x[1] > confidence_interval or \
+                    abs(elem.fit1D_y[1]-avr_inf.fit1D_y[1])/avr_inf.fit1D_y[1] > confidence_interval:
                         to_remove.append(elem)
             for elem in to_remove:
                 print('remove element',shot_list.index(elem), elem.image_url )
                 shot_list.remove(elem)
     w.bar_style='success'
-    w.description = 'Sifting Done'
-
-
-# In[ ]:
-
+    w.description = 'Sifting Done'# not used now
 def single_directory_sift(d_tuple, confidence_interval):
     """Function to use in parallel sigting
     !!! works slower than without parallelism"""
@@ -376,14 +403,13 @@ def single_directory_sift(d_tuple, confidence_interval):
         avr_inf = Avr_inf(shot_list, do_fit2D=False)
         to_remove = []
         for elem in shot_list:
-            if abs(elem.x_data_fit[1]-avr_inf.x_data_fit[1])/avr_inf.x_data_fit[1] > confidence_interval or                 abs(elem.y_data_fit[1]-avr_inf.y_data_fit[1])/avr_inf.y_data_fit[1] > confidence_interval:
+            if abs(elem.x_data_fit[1]-avr_inf.x_data_fit[1])/avr_inf.x_data_fit[1] > confidence_interval or \
+                abs(elem.y_data_fit[1]-avr_inf.y_data_fit[1])/avr_inf.y_data_fit[1] > confidence_interval:
                     to_remove.append(elem)
         for elem in to_remove:
             print('remove element',shot_list.index(elem), elem.image_url )
             shot_list.remove(elem)
     return folderN, folder_dict 
-
-
 # In[ ]:
 
 def normalise_avr_image(dictionary, signal_shot, calibration_shot, attribute, index=None, do_fit2D = True):
@@ -458,6 +484,7 @@ class N_atoms:
 # In[ ]:
 
 def real_size(x, binning=2, pixel_size = 22.3/4):
+    # returns size of each picset on getted image based on binning and individual pixel size
     return x * binning * pixel_size
 
 
@@ -501,9 +528,11 @@ def data2_sort(x,y):
 
 # In[ ]:
 
+# default labels for axes
 x_lbl_default = 'time, ms'
 y_lbl_default = 'N atoms'
 
+# below function to handle different measurement types
 def parametric_resonance(conf_params):
     if 'XAXIS' in conf_params:
         xaxis = re.findall('([0-9.]+)(\w+)',conf_params['XAXIS'])[0]
@@ -520,7 +549,7 @@ def feshbach(conf_params):
     return x_lbl, y_lbl_default, lambda x: FB_conf[conf_params['CONF'].upper()][0] * x +                                         FB_conf[conf_params['CONF'].upper()][1] * float(conf_params['OFFSET'])
     
 def temperature(conf_params):
-    y_lbl = 'cloud size, μm'
+    y_lbl = 'cloud size, $\mu$ m'
     return x_lbl_default,y_lbl, lambda y: y
 
 def clock(conf_params):
@@ -536,15 +565,16 @@ def as_measurement(conf_params,dirs,folder):
 
 def lifetime(conf_params):
     return x_lbl_default, y_lbl_default, lambda y: y
-meas_types = dict()
 
-FB_conf = {'BH':(1,0.1)}
+
+# dictionary for coils Gauss/Amper values
+FB_conf = {'BH':(10.2,0.25)}
 FB_conf['SH']=(FB_conf['BH'][1],FB_conf['BH'][0])
 
-# 'FB' means that magnetic field is scanned
+# dictionary for normalize functions
+meas_types = dict()
 meas_types['FB'] = feshbach
 meas_types['T']  = temperature
-# lambda function is used up to now due to axis are default ones
 meas_types['LT'] = lifetime
 meas_types['CL'] = clock
 meas_types['PR'] = parametric_resonance
@@ -554,6 +584,9 @@ meas_types['AS'] = as_measurement
 # In[ ]:
 
 def get_x_calibration(folder,dirs):
+    """
+    Calibrates x axis depending on measurement type and parameters specified in folder name
+    """
     meas_type = re.findall('\d+\s+(\w+)',folder)
     conf = re.findall('(\w+)=(\S+)+', folder)
     conf_params = {key.upper(): value for (key, value) in conf}
@@ -568,5 +601,5 @@ def get_x_calibration(folder,dirs):
 
 # In[ ]:
 
-print('Done importing, module image_processing')
+print('Done importing, module image_processing now')
 
