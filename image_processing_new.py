@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[ ]:
+# In[3]:
 
 #%pylab inline
 #from IPython.html.widgets import FloatProgress
@@ -12,7 +12,7 @@ import re
 import json
 
 
-# In[ ]:
+# In[4]:
 
 #class for encoding numpy array to json
 class JsonCustomEncoder(json.JSONEncoder):
@@ -31,7 +31,7 @@ class JsonCustomEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
-# In[ ]:
+# In[5]:
 
 # removed coeffitioent 2 in gaussian functions in exponents
 def gaussian(x,N,x0,sigma, background):
@@ -48,7 +48,7 @@ def gaussian2D(N, x0, y0, sigma_x, sigma_y, background):
                         -(((x - x0) / sigma_x)**2 + ((y - y0) / sigma_y)**2)) + background
 
 
-# In[1]:
+# In[6]:
 
 class Image_Basics():
     """Basic image processing, with only center determination and background substructing. 
@@ -87,7 +87,7 @@ class Image_Basics():
     # removed coeffitioent 2 in gaussian functions in exponents
 
 
-# In[ ]:
+# In[7]:
 
 class Load_Image():
     """ Class for loading image. 
@@ -118,6 +118,7 @@ class Load_Image():
         from re import findall
         data = Image_Basics(imread(image_url),image_url)
         (data.folderN, data.shotN, data.shot_typeN) = map(float, findall(r"[-+]?\d*\.\d+|\d+", image_url)[-3:])
+        
         if self.do_filtering:
             data.image = self.filter_function(data.image,self.filter_param)
         try: 
@@ -147,7 +148,7 @@ class Load_Image():
         return res.result
 
 
-# In[ ]:
+# In[8]:
 
 def rearrange_data(all_data,sift_by_isgood=True):
     """ Rearranges data from flat list to dictionary simultaneously dropping bad images if flag sift_by_isgood is set
@@ -174,7 +175,7 @@ def rearrange_data(all_data,sift_by_isgood=True):
     return dataD
 
 
-# In[ ]:
+# In[9]:
 
 class Avr_Image():
     """ Class for average data, has all attributes as Load_Image
@@ -258,7 +259,7 @@ class Avr_Image():
         return avr_data_dict
 
 
-# In[ ]:
+# In[10]:
 
 def mod_avrData(avr_dataD, folderN_calib,n_atom_calib, lin_dim_calib):
     """ modifys avr_dataD dictionary with
@@ -292,7 +293,7 @@ def mod_avrData(avr_dataD, folderN_calib,n_atom_calib, lin_dim_calib):
     return navrD
 
 
-# In[ ]:
+# In[11]:
 
 def get_avr_data(navrD, shot_typeN, attribute, index=None): 
     """ Construct data for plot from navrD dictionary
@@ -336,7 +337,7 @@ def get_avr_data_for_plot(avr_dataD, shot_typeN, norm_func, attribute, index=Non
     except AttributeError:
         d_plot['yerr']=None
     return d_plot
-# In[ ]:
+# In[12]:
 
 #not needed now
 def get_value(obj, attribute, index):
@@ -347,7 +348,7 @@ def get_value(obj, attribute, index):
         return getattr(obj,attribute)
 
 
-# In[ ]:
+# In[13]:
 
 # used for constracting data from individual images
 def constract_data(dictionary, shot_typeN, attribute, index = None):
@@ -410,7 +411,7 @@ def single_directory_sift(d_tuple, confidence_interval):
             print('remove element',shot_list.index(elem), elem.image_url )
             shot_list.remove(elem)
     return folderN, folder_dict 
-# In[ ]:
+# In[14]:
 
 def normalise_avr_image(dictionary, signal_shot, calibration_shot, attribute, index=None, do_fit2D = True):
     """normalize image from evarage dictionary using attribute[index] value - usually 'total' or 'x_data_fit[0]'
@@ -430,7 +431,7 @@ def normalise_avr_image(dictionary, signal_shot, calibration_shot, attribute, in
     return norm_data
 
 
-# In[ ]:
+# In[15]:
 
 def normalise_individual_image(dictionary, signal_shot, calibration_shot, attribute, index=None, do_fit2D = False):
     """normalize each image using attribute[index] value - usually 'total' or 'x_data_fit[0]'
@@ -458,7 +459,7 @@ def normalise_individual_image(dictionary, signal_shot, calibration_shot, attrib
     return norm_data
 
 
-# In[ ]:
+# In[16]:
 
 class N_atoms:
   """
@@ -481,14 +482,14 @@ class N_atoms:
     return signal*self.p
 
 
-# In[ ]:
+# In[17]:
 
 def real_size(x, binning=2, pixel_size = 22.3/4):
     # returns size of each picset on getted image based on binning and individual pixel size
     return x * binning * pixel_size
 
 
-# In[ ]:
+# In[18]:
 
 def drop_data(data_lists, points):
     """ Drop points from all lists in data_list, mask is constracted using first list in data_lists"""
@@ -499,7 +500,7 @@ def drop_data(data_lists, points):
     return res
 
 
-# In[ ]:
+# In[19]:
 
 def drop_by_number(data, *numbers):
     """Drops point by its serial number"""
@@ -508,7 +509,7 @@ def drop_by_number(data, *numbers):
             data[k] = delete(data[k],numbers)
 
 
-# In[1]:
+# In[20]:
 
 def drop_by_x(data, *points):
     """Drops point by its 'x' value"""
@@ -518,7 +519,7 @@ def drop_by_x(data, *points):
             data[k] = data[k][mask]
 
 
-# In[ ]:
+# In[21]:
 
 def data2_sort(x,y):
     """ Sort both array x and y using x-array as criteria"""
@@ -526,7 +527,7 @@ def data2_sort(x,y):
     return res[:,0],res[:,1]
 
 
-# In[ ]:
+# In[22]:
 
 # default labels for axes
 x_lbl_default = 'time, ms'
@@ -581,7 +582,7 @@ meas_types['PR'] = parametric_resonance
 meas_types['AS'] = as_measurement
 
 
-# In[ ]:
+# In[23]:
 
 def get_x_calibration(folder,dirs):
     """
@@ -599,7 +600,7 @@ def get_x_calibration(folder,dirs):
         return meas_types[meas_type[0].upper()](conf_params)
 
 
-# In[ ]:
+# In[24]:
 
 print('Done importing, module image_processing now')
 

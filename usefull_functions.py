@@ -3,14 +3,22 @@
 
 # In[ ]:
 
+from numpy import *
+
 def exp_decay(t, N0, tau, background):
     return N0 * exp(- t / tau) + background
+
 def exp_decay_no_bg(t, N0, tau):
     return N0 * exp(- t / tau)
+
 def cloud_expansion(t, T, r0, t0):
     k_b = 1.38e-23
     m = 169 * 1.66e-27
     return sqrt(r0**2 + 2 * k_b * T * (t + 1*t0)**2 / m)
+
+def cloud_expansion0(t, T, r0):
+    return cloud_expansion(t, T, r0, 0)
+
 def exp_grouth(t, N0, tau, background):
     return N0 * ( 1 - exp( - t / tau)) + 0*background
 
