@@ -32,3 +32,6 @@ def construct_fit_description(fit_func, popt_T):
     res = res.rstrip('\n')
     return res
 
+def lorentz(x, N, x0, sigma, background):
+    return N/pi * 1/2 * sigma / ( (x - x0)**2 + (1/2*sigma)**2) + background
+
