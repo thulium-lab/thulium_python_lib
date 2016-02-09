@@ -43,6 +43,10 @@ def construct_fit_description(fit_func, popt_T):
     res = res.rstrip('\n')
     return res
 
+<<<<<<< HEAD
+def lorentz(x, N, x0, sigma, background):
+    return N/pi * 1/2 * sigma / ( (x - x0)**2 + (1/2*sigma)**2) + background
+=======
 
 # ### Including some losses 
 
@@ -60,4 +64,5 @@ def two_frac_decay(t, N0, N1, tau, betta,  background):
 def two_frac_decay_no_bg(t, N0, N1, tau, betta, background):
     r'return two_frac_decay(t, N0, N1, tau, betta,0)'
     return two_frac_decay(t, N0, N1, tau, betta,0)
+>>>>>>> origin/master
 
