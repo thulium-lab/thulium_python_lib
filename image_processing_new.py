@@ -48,7 +48,7 @@ def gaussian2D(N, x0, y0, sigma_x, sigma_y, background):
                         -(((x - x0) / sigma_x)**2 + ((y - y0) / sigma_y)**2)) + background
 
 
-# In[6]:
+# In[1]:
 
 class Image_Basics():
     """Basic image processing, with only center determination and background substructing. 
@@ -57,7 +57,12 @@ class Image_Basics():
         (i.e. if image is blank)"""
     def __init__(self,image, image_url='not_defined'):
         self.image_url = image_url
-        self.image = image
+        if len(image.shape) == 3:
+            self.image = image[:,:,0]
+        else:
+            self.image = image
+        if mean(self.image) > 0.8:
+            self.image = 1 - self.image
         c_pos = self.image.argmax()
         self.center_pos = array([c_pos//self.image.shape[1], c_pos%self.image.shape[1]])
         self.image = self.bgd_substract()
@@ -191,40 +196,63 @@ class Avr_Image():
         self.filter_param = 1 # for gaussian filtering
         dview['averager']=self
     def check_image(self,avr_image, image): 
-        # check is based on comparison position of center of average image and individual image
+        # new version - check if image is good is based on information from x and y coordinates from 1D fits
         conf_int = 0.1
-        x = image.isgood             and abs((avr_image.center_pos[0] - image.center_pos[0]) / avr_image.center_pos[0]) < conf_int             and abs((avr_image.center_pos[1] - image.center_pos[1]) / avr_image.center_pos[1]) < conf_int
+        x = image.isgood             and abs((avr_image.fit1D_x[1] - image.fit1D_x[1]) / avr_image.fit1D_x[1]) < conf_int             and abs((avr_image.fit1D_y[1] - image.fit1D_y[1]) / avr_image.fit1D_y[1]) < conf_int
+        image.isgood = x
         return x
     def avr_image(self,folderN, shot_typeN, image_list):
         """ For average image there are (if) exist everaged data from each image and its standatd deviation:
         data.total_mean, data.total_std, fit1D_x(y)_mean, fit1D_x(y)_std, data.fit2D_mean, data.fit2D_std
         If any fit wasn't found avr_image is not added to the dictionary"""
+        # first construct avr image from all images (they are already good as defiend in rearrange_data
         data = Image_Basics(mean([d.image for d in image_list],0), "folder=%f,shot_typeN=%i"%(folderN,shot_typeN))
-        # sifting 
-        if self.do_sifting:
-            # construct new image list with valid images
-            new_image_list = [image for image in image_list if self.check_image(data, image)]
-#             print("folder=%f,shot_typeN=%i"%(folderN,shot_typeN), len(image_list),len(new_image_list))
-            if len(new_image_list) == 0:
-                print("All images are sifted in" + data.image_url)
-                data.isgood = False
-                return []
-            else:
-                print(len(image_list) - len(new_image_list), 'images are sifted in', data.image_url)
-                image_list = new_image_list
-                # construct new average image from this new list
-                data = Image_Basics(mean([d.image for d in image_list],0), "folder=%f,shot_typeN=%i"%(folderN,shot_typeN))
+        # try to construct fits (if later do filtering then pass 2D fitting as it is timeconsuming)
         try: 
             if self.do_fit1D_x:
                 data.fit1D_x = data.fit_gaussian1D(0)
             if self.do_fit1D_y:
                 data.fit1D_y = data.fit_gaussian1D(1)
-            if self.do_fit2D:
-                data.fit2D = data.fit_gaussian2D()
         except RuntimeError:
             print("RuntimeError, couldn't find fit for image", data.image_url)
             data.isgood = False
-            return []
+            return [(self,folderN, shot_typeN)]
+        
+        # sifting 
+        bad_images = []
+        if self.do_sifting:
+            # construct new image list with valid images by doing self.check_image
+            new_image_list = [image for image in image_list if self.check_image(data, image)]
+            bad_images.extend([(folderN, shot_typeN,i) for (i,x) in enumerate(image_list) if not x.isgood])
+#             print("folder=%f,shot_typeN=%i"%(folderN,shot_typeN), len(image_list),len(new_image_list))
+            if len(new_image_list) == 0:
+                print("All images are sifted in" + data.image_url)
+                data.isgood = False
+                return [(self,folderN, shot_typeN)]
+            else:
+                print(len(image_list) - len(new_image_list), 'images are sifted in', data.image_url)
+                image_list = new_image_list
+                # construct new average image from this new list
+                data = Image_Basics(mean([d.image for d in image_list],0), "folder=%f,shot_typeN=%i"%(folderN,shot_typeN))
+                try: 
+                    if self.do_fit1D_x:
+                        data.fit1D_x = data.fit_gaussian1D(0)
+                    if self.do_fit1D_y:
+                        data.fit1D_y = data.fit_gaussian1D(1)
+                    if self.do_fit2D:
+                        data.fit2D = data.fit_gaussian2D()
+                except RuntimeError:
+                    print("RuntimeError, couldn't find fit for image", data.image_url)
+                    data.isgood = False
+                    return [(self,folderN, shot_typeN)]
+        else:
+            try:
+                if  self.do_fit2D:
+                    data.fit2D = data.fit_gaussian2D()
+            except RuntimeError:
+                print("RuntimeError, couldn't find fit for image", data.image_url)
+                data.isgood = False
+                return [(self,folderN, shot_typeN)]
         data.total_mean = mean([d.total for d in image_list],0)
         data.total_std = std([d.total for d in image_list],0)
         if not all([x.isgood for x in image_list]):
@@ -239,23 +267,29 @@ class Avr_Image():
             if hasattr(image_list[0],'fit2D'):
                 data.fit2D_mean = mean([d.fit2D for d in image_list],0)
                 data.fit2D_std = std([d.fit2D for d in image_list],0)
-        return (folderN, shot_typeN, data)  
+        return (folderN, shot_typeN, data, bad_images)  
     def __call__(self, dataD, lview):
         """ Construct average image
         """
         images_to_avr = []
         for folderN, folder_dict in dataD.items():
             for shot_typeN, image_list in folder_dict.items():
-                images_to_avr.append((folderN,shot_typeN,image_list))
-        res = lview.map(lambda *x: self.avr_image(*x), *zip(*images_to_avr))
+                images_to_avr.append([folderN,shot_typeN,array(image_list)])
+        res = lview.map(self.avr_image, *zip(*images_to_avr))
         res.wait_interactive()
         print(''.join([x['stdout'] for x in res.metadata]))
         avr_data_list = res.result
         avr_data_dict = dict()
         for elem in avr_data_list:
-            if len(elem) != 0:
+            if len(elem) == 4:
                 avr_data_dict[elem[0]] = avr_data_dict.get(elem[0],dict())
                 avr_data_dict[elem[0]][elem[1]]=elem[2]
+                for folderN,shot_typeN,i in elem[3]:
+                    dataD[folderN][shot_typeN][i].isgood = False
+            elif len(elem) == 1:
+                for folderN,shot_typeN in elem[0]:
+                    for im in dataD[folderN][shot_typeN]:
+                        im.isgood = False
         return avr_data_dict
 
 
@@ -312,7 +346,7 @@ def get_avr_data(navrD, shot_typeN, attribute, index=None):
     d_plot['y'] = array([navrD[xx][shot_typeN][attribute][index] if index != None else navrD[xx][shot_typeN][attribute+'_std'] for xx in d_plot['x']])
     try:
         d_plot['yerr'] = array([navrD[xx][shot_typeN][attribute+'_std'][index] if index != None else navrD[xx][shot_typeN][attribute] for xx in d_plot['x']])
-    except AttributeError:
+    except KeyError:
         d_plot['yerr']=None
     return d_plot
 
@@ -371,6 +405,34 @@ def constract_data(dictionary, shot_typeN, attribute, index = None):
         y_data = append(y_data, temp_arr)
         x_data = append(x_data, ones(len(temp_arr)) * folderN)
     return x_data, y_data
+
+
+# In[ ]:
+
+# used for constracting data from individual images for scatter plot
+def constract_data_scatter(dictionary, shot_typeN, attribute, index = None):
+    """The most usefull tool. Returns x_data and y_data list already suitable for plotting (i.e. with the same length)
+    dictionary - the dictionary to extract data from (i.e. dataD or avr_dataD)
+    shot_typeN - type of the shot sequence (the last number in image name)
+    attribute - which attribute of data instance to use !!!look at help for Avr_inf and Image_Image and all their 
+    parents
+    index - if attribute is a list, specifies which paticular data to use"""
+    x_data = array([])
+    y_data = array([])
+    colors = array([])
+    import collections
+    for folderN, f_dict in dictionary.items():
+        if f_dict == {}:
+            continue
+        if isinstance(f_dict[shot_typeN], collections.Iterable):
+            temp_arr = [get_value(elem, attribute, index) for elem in f_dict[shot_typeN]]
+        else:
+            temp_arr = [get_value(f_dict[shot_typeN], attribute, index)]
+        y_data = append(y_data, temp_arr)
+        x_data = append(x_data, ones(len(temp_arr)) * folderN)
+        cl = ['b' if x.isgood else 'r' for x in f_dict[shot_typeN]]
+        colors = append(colors,cl)
+    return x_data, y_data,colors
 
 # not used now
 def sift(dataD, confidence_interval = 0.1):
