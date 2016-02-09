@@ -1,6 +1,17 @@
 
 # coding: utf-8
 
+# In[ ]:
+
+"""
+Last modified 08.02.2016
+This is file for instruments in image proseccing functionality.
+NOTES:
+1. In Avr_Image.avr_image if 2D fit is not found, this avr_image is treated as bad and throwed away and all individual
+images are treated as bad. This can be changed if needed
+"""
+
+
 # In[3]:
 
 #%pylab inline
@@ -57,10 +68,17 @@ class Image_Basics():
         (i.e. if image is blank)"""
     def __init__(self,image, image_url='not_defined'):
         self.image_url = image_url
-        if len(image.shape) == 3:
+        assert hasattr(image,'shape'), 'Image hasnt shape attribute - not a numpy array'
+        if len(image.shape) == 2:
+            # usual grey MxN image
+            self.image = image
+        elif len(image.shape) == 3:
+            # RGB of RGBA image, take only R component (if ones needed - add additional argument (default None) to 
+            # specify which color to use)
             self.image = image[:,:,0]
         else:
-            self.image = image
+            raise Exception('Image has wrong dimention ', image.shape())
+        # if pixels value in between [0,1] if mean close to 1 then image has inverted colors
         if mean(self.image) > 0.8:
             self.image = 1 - self.image
         c_pos = self.image.argmax()
@@ -69,7 +87,7 @@ class Image_Basics():
         self.total = sum(self.image)
         self.isgood = True
     def bgd_substract(self, slice_to_c = (-20,-1)):
-        """ Substracts background, which is calculated using vertical strip at right side"""
+        """ ATENTION: Substracts background, which is calculated using vertical strip at right side"""
         data_for_bgd_det = self.image[:,slice_to_c[0]:slice_to_c[1]]
         av = sum(data_for_bgd_det,1)/data_for_bgd_det.shape[1]
         return self.image - tile(av[:,newaxis],self.image.shape[1])
@@ -120,9 +138,14 @@ class Load_Image():
             fit2D  = [total, y0, x0, sigma_y, sigma_x, background]
         """
         from matplotlib.pyplot import imread
+        import os
         from re import findall
         data = Image_Basics(imread(image_url),image_url)
-        (data.folderN, data.shotN, data.shot_typeN) = map(float, findall(r"[-+]?\d*\.\d+|\d+", image_url)[-3:])
+        dr,fl = dr,fr = os.path.split(image_url)
+        data.folderN = float(re.findall(r"[-+]?\d*\.\d+|\d+",dr)[-1])
+        nbrs = re.findall(r"[-+]?\d*\.\d+|\d+",fl)
+        data.shotN, data.shot_typeN = map(float,nbrs if len(nbrs)==2 else (nbrs[0],'1'))
+#         (data.folderN, data.shotN, data.shot_typeN) = map(float, findall(r"[-+]?\d*\.\d+|\d+", image_url)[-3:])
         
         if self.do_filtering:
             data.image = self.filter_function(data.image,self.filter_param)
@@ -143,7 +166,9 @@ class Load_Image():
         """
         import os, re
         dirs = [os.path.join(directory,dr) for dr in os.listdir(directory) if re.match(r'[-+]?[0-9.]+ms',dr)]
-        files_to_load = [os.path.join(dr,fl) for dr in dirs for fl in os.listdir(dr) if re.match(r'.*_\d+.png',fl)]
+        assert len(dirs), 'There are no folders with data (pattern [-+]?[0-9.]+ms)'
+        files_to_load = [os.path.join(dr,fl) for dr in dirs for fl in os.listdir(dr) if re.match(r'\d+.*\.(:?png|jpg)$',fl)]
+        assert len(files_to_load), 'There are no jpg or png files to load'
         res = lview.map(lambda x: self.load_image(x), files_to_load)
         res.wait_interactive()
         #all_data = list(flatten(res.result))
@@ -185,7 +210,7 @@ def rearrange_data(all_data,sift_by_isgood=True):
 class Avr_Image():
     """ Class for average data, has all attributes as Load_Image
         """
-    def __init__(self, dview=None, do_fit1D_x=True, do_fit1D_y=True, do_fit2D=True, do_filtering=False, do_sifting=True):
+    def __init__(self, dview=None, do_fit1D_x=True, do_fit1D_y=True, do_fit2D=True, do_filtering=False, do_sifting=True,conf_int=0.2):
         from scipy.ndimage import gaussian_filter#, median_filter
         self.do_fit1D_x = do_fit1D_x
         self.do_fit1D_y = do_fit1D_y
@@ -194,17 +219,19 @@ class Avr_Image():
         self.do_filtering = do_filtering
         self.filter_function = gaussian_filter
         self.filter_param = 1 # for gaussian filtering
+        self.conf_int = conf_int
         dview['averager']=self
     def check_image(self,avr_image, image): 
         # new version - check if image is good is based on information from x and y coordinates from 1D fits
-        conf_int = 0.1
-        x = image.isgood             and abs((avr_image.fit1D_x[1] - image.fit1D_x[1]) / avr_image.fit1D_x[1]) < conf_int             and abs((avr_image.fit1D_y[1] - image.fit1D_y[1]) / avr_image.fit1D_y[1]) < conf_int
+        x = image.isgood             and abs((avr_image.fit1D_x[1] - image.fit1D_x[1]) / avr_image.fit1D_x[1]) < self.conf_int             and abs((avr_image.fit1D_y[1] - image.fit1D_y[1]) / avr_image.fit1D_y[1]) < self.conf_int
         image.isgood = x
         return x
     def avr_image(self,folderN, shot_typeN, image_list):
         """ For average image there are (if) exist everaged data from each image and its standatd deviation:
         data.total_mean, data.total_std, fit1D_x(y)_mean, fit1D_x(y)_std, data.fit2D_mean, data.fit2D_std
-        If any fit wasn't found avr_image is not added to the dictionary"""
+        If any fit wasn't found avr_image is not added to the dictionary
+        ATTENSION:
+        As image list transfers as copy, its paramepers modification here has no effect outside"""
         # first construct avr image from all images (they are already good as defiend in rearrange_data
         data = Image_Basics(mean([d.image for d in image_list],0), "folder=%f,shot_typeN=%i"%(folderN,shot_typeN))
         # try to construct fits (if later do filtering then pass 2D fitting as it is timeconsuming)
@@ -216,21 +243,22 @@ class Avr_Image():
         except RuntimeError:
             print("RuntimeError, couldn't find fit for image", data.image_url)
             data.isgood = False
-            return [(self,folderN, shot_typeN)]
+            bad_images = [(folderN, shot_typeN,i) for (i,x) in enumerate(image_list)]
+            return (data.isgood,folderN, shot_typeN, (), bad_images)
         
         # sifting 
         bad_images = []
         if self.do_sifting:
             # construct new image list with valid images by doing self.check_image
             new_image_list = [image for image in image_list if self.check_image(data, image)]
-            bad_images.extend([(folderN, shot_typeN,i) for (i,x) in enumerate(image_list) if not x.isgood])
+            bad_images = [(folderN, shot_typeN,i) for (i,x) in enumerate(image_list) if not x.isgood]
 #             print("folder=%f,shot_typeN=%i"%(folderN,shot_typeN), len(image_list),len(new_image_list))
             if len(new_image_list) == 0:
                 print("All images are sifted in" + data.image_url)
                 data.isgood = False
-                return [(self,folderN, shot_typeN)]
+                return (data.isgood, folderN, shot_typeN, (), bad_images)
             else:
-                print(len(image_list) - len(new_image_list), 'images are sifted in', data.image_url)
+                print(len(bad_images), 'images are sifted in', data.image_url)
                 image_list = new_image_list
                 # construct new average image from this new list
                 data = Image_Basics(mean([d.image for d in image_list],0), "folder=%f,shot_typeN=%i"%(folderN,shot_typeN))
@@ -244,7 +272,7 @@ class Avr_Image():
                 except RuntimeError:
                     print("RuntimeError, couldn't find fit for image", data.image_url)
                     data.isgood = False
-                    return [(self,folderN, shot_typeN)]
+                    return (data.isgood,folderN, shot_typeN, (), bad_images)
         else:
             try:
                 if  self.do_fit2D:
@@ -252,9 +280,11 @@ class Avr_Image():
             except RuntimeError:
                 print("RuntimeError, couldn't find fit for image", data.image_url)
                 data.isgood = False
-                return [(self,folderN, shot_typeN)]
+                bad_images = [(folderN, shot_typeN,i) for (i,x) in enumerate(image_list)]
+                return (data.isgood,folderN, shot_typeN, (), bad_images)
         data.total_mean = mean([d.total for d in image_list],0)
         data.total_std = std([d.total for d in image_list],0)
+        # following line should always be False as at this moment all images in image_list should be good
         if not all([x.isgood for x in image_list]):
             print('There are bad images in ',"folder=%f,shot_typeN=%i"%(folderN,shot_typeN))
         else:
@@ -267,7 +297,7 @@ class Avr_Image():
             if hasattr(image_list[0],'fit2D'):
                 data.fit2D_mean = mean([d.fit2D for d in image_list],0)
                 data.fit2D_std = std([d.fit2D for d in image_list],0)
-        return (folderN, shot_typeN, data, bad_images)  
+        return (data.isgood, folderN, shot_typeN, data, bad_images)  
     def __call__(self, dataD, lview):
         """ Construct average image
         """
@@ -281,15 +311,11 @@ class Avr_Image():
         avr_data_list = res.result
         avr_data_dict = dict()
         for elem in avr_data_list:
-            if len(elem) == 4:
-                avr_data_dict[elem[0]] = avr_data_dict.get(elem[0],dict())
-                avr_data_dict[elem[0]][elem[1]]=elem[2]
-                for folderN,shot_typeN,i in elem[3]:
-                    dataD[folderN][shot_typeN][i].isgood = False
-            elif len(elem) == 1:
-                for folderN,shot_typeN in elem[0]:
-                    for im in dataD[folderN][shot_typeN]:
-                        im.isgood = False
+            for folderN,shot_typeN,i in elem[4]:
+                dataD[folderN][shot_typeN][i].isgood = False
+            if elem[0]:
+                avr_data_dict[elem[1]] = avr_data_dict.get(elem[1],dict())
+                avr_data_dict[elem[1]][elem[2]]=elem[3]
         return avr_data_dict
 
 
@@ -343,9 +369,9 @@ def get_avr_data(navrD, shot_typeN, attribute, index=None):
         else:
             print('navrD has no average image for folderN=%i shot_typeN=%i' % (k,shot_typeN))
     d_plot['x'] = array(ks_f)
-    d_plot['y'] = array([navrD[xx][shot_typeN][attribute][index] if index != None else navrD[xx][shot_typeN][attribute+'_std'] for xx in d_plot['x']])
+    d_plot['y'] = array([navrD[xx][shot_typeN][attribute][index] if index != None else navrD[xx][shot_typeN][attribute] for xx in d_plot['x']])
     try:
-        d_plot['yerr'] = array([navrD[xx][shot_typeN][attribute+'_std'][index] if index != None else navrD[xx][shot_typeN][attribute] for xx in d_plot['x']])
+        d_plot['yerr'] = array([navrD[xx][shot_typeN][attribute+'_std'][index] if index != None else navrD[xx][shot_typeN][attribute+'_std'] for xx in d_plot['x']])
     except KeyError:
         d_plot['yerr']=None
     return d_plot
@@ -594,7 +620,7 @@ def data2_sort(x,y):
 # default labels for axes
 x_lbl_default = 'time, ms'
 y_lbl_default = 'N atoms'
-
+meas_type_default = 'LT'
 # below function to handle different measurement types
 def parametric_resonance(conf_params):
     if 'XAXIS' in conf_params:
@@ -622,7 +648,7 @@ def clock(conf_params):
 def as_measurement(conf_params,dirs,folder):
     as_folder = [x for x in dirs if x.startswith(re.findall('\A\d+\s+\w+\s+(\d+)', folder)[0])]
     if len(as_folder) == 0:
-        return x_lbl_default, y_lbl_default, lambda x: x
+        return meas_type_default,x_lbl_default, y_lbl_default, lambda x: x
     else:
         return get_x_calibration(as_folder[0], dirs)
 
@@ -655,11 +681,53 @@ def get_x_calibration(folder,dirs):
     conf_params = {key.upper(): value for (key, value) in conf}
     if len(meas_type) == 0 or meas_type[0].upper() not in meas_types:
         # no calibration for x axis and labels are default ms and Natoms
-        return x_lbl_default, y_lbl_default, lambda x: x
+        return meas_type_default,x_lbl_default, y_lbl_default, lambda x: x
     elif meas_type[0].upper() == 'AS':
         return as_measurement(conf_params,dirs,folder)
     else:
-        return meas_types[meas_type[0].upper()](conf_params)
+        return (meas_type[0].upper(),*meas_types[meas_type[0].upper()](conf_params))
+
+
+# In[ ]:
+
+def get_pandas_table(navrD):
+    import pandas as pd
+    # helper function for index egneration for table
+    def gen_indexs(keys):
+        tpls = []
+        tr_table = {'fit1D':['N','x0','sigma','bgnd'], 
+                    'fit2D':['N','y0','x0','sigma_y','sigma_x','bgnd'],
+                    'center_pos':['x','y']}
+        for key in keys:
+            if key.startswith('image'):
+                continue
+            desc = ['']
+            for tkey in tr_table:
+                if key.startswith(tkey):
+                    desc = tr_table[tkey]
+                    break
+            tpls.extend([(key, name) for name in desc])
+        return tpls
+    dd = None
+    for time in sorted(navrD.keys()):
+        for meas_type in navrD[time]:
+            keys = list(navrD[time][meas_type])
+            tpls = [('folder',''),('type',''),*gen_indexs(keys)]
+            cols = pd.MultiIndex.from_tuples(tpls)
+            tbl = pd.DataFrame(zeros((1,len(tpls))),columns=cols)
+            tbl.time = time
+            tbl.loc[0,'folder'] = time
+            tbl.loc[0,'type'] = meas_type
+            for key in keys:
+                if key.startswith('image'):
+                    continue
+                tbl.loc[0,key] = navrD[time][meas_type][key]
+            if dd is None:
+                dd = tbl
+            else:
+                dd = dd.append(tbl,ignore_index=True)
+    # dd = dd.set_index(['type','time'])
+    return dd
 
 
 # In[24]:
