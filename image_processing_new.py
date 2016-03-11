@@ -638,7 +638,7 @@ def feshbach(conf_params):
     return x_lbl, y_lbl_default, lambda x: FB_conf[conf_params['CONF'].upper()][0] * x +                                         FB_conf[conf_params['CONF'].upper()][1] * float(conf_params['OFFSET'])
     
 def temperature(conf_params):
-    y_lbl = 'cloud size, $\mu$ m'
+    y_lbl = 'cloud radius, $\mu$ m'
     return x_lbl_default,y_lbl, lambda y: y
 
 def clock(conf_params):
