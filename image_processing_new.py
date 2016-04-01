@@ -174,8 +174,8 @@ class Load_Image():
         #all_data = list(flatten(res.result))
         #all_data = list(flatten(map(self.load_image, files_to_load)))
         print(''.join([x['stdout'] for x in res.metadata]))
-        print('Total number of images: ', len(res.result))
-        return res.result
+        print('Total number of images: ', len(res.result()))
+        return res.result()
 
 
 # In[8]:
@@ -308,7 +308,7 @@ class Avr_Image():
         res = lview.map(self.avr_image, *zip(*images_to_avr))
         res.wait_interactive()
         print(''.join([x['stdout'] for x in res.metadata]))
-        avr_data_list = res.result
+        avr_data_list = res.result()
         avr_data_dict = dict()
         for elem in avr_data_list:
             for folderN,shot_typeN,i in elem[4]:
