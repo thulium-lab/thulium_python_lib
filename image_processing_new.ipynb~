@@ -2,6 +2,7 @@
  "cells": [
   {
    "cell_type": "code",
+<<<<<<< HEAD
    "execution_count": null,
    "metadata": {
     "collapsed": true
@@ -20,6 +21,9 @@
   {
    "cell_type": "code",
    "execution_count": 3,
+=======
+   "execution_count": 1,
+>>>>>>> origin/master
    "metadata": {
     "collapsed": false,
     "run_control": {
@@ -154,7 +158,7 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 1,
+   "execution_count": 7,
    "metadata": {
     "collapsed": true
    },
@@ -168,7 +172,7 @@
     "        To change filter function from default (gaussian_filter), do instance.filter_functions = new_function, it should take\n",
     "        only 1 parameter\n",
     "        \"\"\"\n",
-    "    def __init__(self, dview = None, do_fit1D_x=True, do_fit1D_y=True, do_fit2D=False, do_filtering=False,n_sigmas=2):\n",
+    "    def __init__(self, dview = None, do_fit1D_x=True, do_fit1D_y=True, do_fit2D=False, do_filtering=False):\n",
     "        from scipy.ndimage import gaussian_filter#, median_filter\n",
     "        self.do_fit1D_x = do_fit1D_x\n",
     "        self.do_fit1D_y = do_fit1D_y\n",
@@ -176,7 +180,6 @@
     "        self.do_filtering = do_filtering\n",
     "        self.filter_function = gaussian_filter\n",
     "        self.filter_param = 1 # for gaussian filtering\n",
-    "        self.n_sigmas = n_sigmas\n",
     "        dview['loader'] = self # loader - name of instance to load images, send this class to subengins for parallel\n",
     "    def load_image(self,image_url):\n",
     "        \"\"\" Loads individual image and performs fits. If fit wasn't found, isgood flag is set to False\n",
@@ -205,9 +208,6 @@
     "                data.fit1D_y = data.fit_gaussian1D(1)\n",
     "            if self.do_fit2D:\n",
     "                data.fit2D = data.fit_gaussian2D()\n",
-    "            if self.do_fit1D_x and self.do_fit1D_y:\n",
-    "                data.total_small = sum(data.image[data.fit1D_y[1]-self.n_sigmas*data.fit1D_y[2]:data.fit1D_y[1]+self.n_sigmas*data.fit1D_y[2],\n",
-    "                                                 data.fit1D_x[1]-self.n_sigmas*data.fit1D_x[2]:data.fit1D_x[1]+self.n_sigmas*data.fit1D_x[2]])\n",
     "        except RuntimeError:\n",
     "            print(\"RuntimeError, couldn't find fit for image\", data.image_url)\n",
     "            data.isgood = False\n",
@@ -226,9 +226,8 @@
     "        #all_data = list(flatten(res.result))\n",
     "        #all_data = list(flatten(map(self.load_image, files_to_load)))\n",
     "        print(''.join([x['stdout'] for x in res.metadata]))\n",
-    "        res_out = res.result()\n",
-    "        print('Total number of images: ', len(res_out))\n",
-    "        return res_out"
+    "        print('Total number of images: ', len(res.result))\n",
+    "        return res.result"
    ]
   },
   {
@@ -375,7 +374,7 @@
     "        res = lview.map(self.avr_image, *zip(*images_to_avr))\n",
     "        res.wait_interactive()\n",
     "        print(''.join([x['stdout'] for x in res.metadata]))\n",
-    "        avr_data_list = res.result()\n",
+    "        avr_data_list = res.result\n",
     "        avr_data_dict = dict()\n",
     "        for elem in avr_data_list:\n",
     "            for folderN,shot_typeN,i in elem[4]:\n",
@@ -956,7 +955,7 @@
    "name": "python",
    "nbconvert_exporter": "python",
    "pygments_lexer": "ipython3",
-   "version": "3.5.1"
+   "version": "3.5.0"
   },
   "latex_envs": {
    "bibliofile": "biblio.bib",

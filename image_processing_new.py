@@ -23,7 +23,7 @@ import re
 import json
 
 
-# In[4]:
+# In[2]:
 
 #class for encoding numpy array to json
 class JsonCustomEncoder(json.JSONEncoder):
@@ -42,7 +42,7 @@ class JsonCustomEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
-# In[5]:
+# In[3]:
 
 # removed coeffitioent 2 in gaussian functions in exponents
 def gaussian(x,N,x0,sigma, background):
@@ -110,7 +110,7 @@ class Image_Basics():
     # removed coeffitioent 2 in gaussian functions in exponents
 
 
-# In[7]:
+# In[1]:
 
 class Load_Image():
     """ Class for loading image. 
@@ -120,7 +120,7 @@ class Load_Image():
         To change filter function from default (gaussian_filter), do instance.filter_functions = new_function, it should take
         only 1 parameter
         """
-    def __init__(self, dview = None, do_fit1D_x=True, do_fit1D_y=True, do_fit2D=False, do_filtering=False):
+    def __init__(self, dview = None, do_fit1D_x=True, do_fit1D_y=True, do_fit2D=False, do_filtering=False,n_sigmas=2):
         from scipy.ndimage import gaussian_filter#, median_filter
         self.do_fit1D_x = do_fit1D_x
         self.do_fit1D_y = do_fit1D_y
@@ -128,6 +128,7 @@ class Load_Image():
         self.do_filtering = do_filtering
         self.filter_function = gaussian_filter
         self.filter_param = 1 # for gaussian filtering
+        self.n_sigmas = n_sigmas
         dview['loader'] = self # loader - name of instance to load images, send this class to subengins for parallel
     def load_image(self,image_url):
         """ Loads individual image and performs fits. If fit wasn't found, isgood flag is set to False
@@ -156,6 +157,9 @@ class Load_Image():
                 data.fit1D_y = data.fit_gaussian1D(1)
             if self.do_fit2D:
                 data.fit2D = data.fit_gaussian2D()
+            if self.do_fit1D_x and self.do_fit1D_y:
+                data.total_small = sum(data.image[data.fit1D_y[1]-self.n_sigmas*data.fit1D_y[2]:data.fit1D_y[1]+self.n_sigmas*data.fit1D_y[2],
+                                                 data.fit1D_x[1]-self.n_sigmas*data.fit1D_x[2]:data.fit1D_x[1]+self.n_sigmas*data.fit1D_x[2]])
         except RuntimeError:
             print("RuntimeError, couldn't find fit for image", data.image_url)
             data.isgood = False
@@ -174,8 +178,9 @@ class Load_Image():
         #all_data = list(flatten(res.result))
         #all_data = list(flatten(map(self.load_image, files_to_load)))
         print(''.join([x['stdout'] for x in res.metadata]))
-        print('Total number of images: ', len(res.result))
-        return res.result
+        res_out = res.result()
+        print('Total number of images: ', len(res_out))
+        return res_out
 
 
 # In[8]:
@@ -308,7 +313,7 @@ class Avr_Image():
         res = lview.map(self.avr_image, *zip(*images_to_avr))
         res.wait_interactive()
         print(''.join([x['stdout'] for x in res.metadata]))
-        avr_data_list = res.result
+        avr_data_list = res.result()
         avr_data_dict = dict()
         for elem in avr_data_list:
             for folderN,shot_typeN,i in elem[4]:
