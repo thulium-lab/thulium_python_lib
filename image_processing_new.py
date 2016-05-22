@@ -4,8 +4,10 @@
 # In[ ]:
 
 """
-Last modified 08.02.2016
+Last modified 27.04.2016
 This is file for instruments in image proseccing functionality.
+Last changes:
+fixed get_pandas_table2(navrD)
 NOTES:
 1. In Avr_Image.avr_image if 2D fit is not found, this avr_image is treated as bad and throwed away and all individual
 images are treated as bad. This can be changed if needed
@@ -178,9 +180,8 @@ class Load_Image():
         #all_data = list(flatten(res.result))
         #all_data = list(flatten(map(self.load_image, files_to_load)))
         print(''.join([x['stdout'] for x in res.metadata]))
-        res_out = res.result()
-        print('Total number of images: ', len(res_out))
-        return res_out
+        print('Total number of images: ', len(res.result()))
+        return res.result()
 
 
 # In[8]:
@@ -643,20 +644,27 @@ def feshbach(conf_params):
     return x_lbl, y_lbl_default, lambda x: FB_conf[conf_params['CONF'].upper()][0] * x +                                         FB_conf[conf_params['CONF'].upper()][1] * float(conf_params['OFFSET'])
     
 def temperature(conf_params):
-    y_lbl = 'cloud size, $\mu$ m'
+    y_lbl = 'cloud radius, $\mu$ m'
     return x_lbl_default,y_lbl, lambda y: y
 
 def clock(conf_params):
     x_lbl = 'AOM frequency, MHz'
     return x_lbl, y_lbl_default, lambda y: y
 
-def as_measurement(conf_params,dirs,folder):
+# def as_measurement(conf_params,dirs,folder):
+#     as_folder = [x for x in dirs if x.startswith(re.findall('\A\d+\s+\w+\s+(\d+)', folder)[0])]
+#     if len(as_folder) == 0:
+#         return meas_type_default,x_lbl_default, y_lbl_default, lambda x: x
+#     else:
+#         return get_x_calibration(as_folder[0], dirs)
+    
+def as_measurement(dirs,folder):
     as_folder = [x for x in dirs if x.startswith(re.findall('\A\d+\s+\w+\s+(\d+)', folder)[0])]
     if len(as_folder) == 0:
-        return meas_type_default,x_lbl_default, y_lbl_default, lambda x: x
+        return None
     else:
-        return get_x_calibration(as_folder[0], dirs)
-
+        return as_folder[0]
+        
 def lifetime(conf_params):
     return x_lbl_default, y_lbl_default, lambda y: y
 
@@ -681,16 +689,41 @@ def get_x_calibration(folder,dirs):
     """
     Calibrates x axis depending on measurement type and parameters specified in folder name
     """
+#     meas_type = re.findall('\d+\s+(\w+)',folder)
+#     conf = re.findall('(\w+)=(\S+)+', folder)
+#     conf_params = {key.upper(): value for (key, value) in conf}
+#     if len(meas_type) == 0 or meas_type[0].upper() not in meas_types:
+#         # no calibration for x axis and labels are default ms and Natoms
+#         return meas_type_default,x_lbl_default, y_lbl_default, lambda x: x
+#     elif meas_type[0].upper() == 'AS':
+#         return as_measurement(conf_params,dirs,folder)
+#     else:
+#         res = (meas_type[0].upper(),*meas_types[meas_type[0].upper()](conf_params))
+#         return res
+    meas_type, conf_params = get_configuration_parameters(folder,dirs)
+    return (meas_type.upper(),conf_params,*meas_types[meas_type](conf_params))
+
+
+# In[ ]:
+
+def get_configuration_parameters(folder,dirs):
     meas_type = re.findall('\d+\s+(\w+)',folder)
     conf = re.findall('(\w+)=(\S+)+', folder)
     conf_params = {key.upper(): value for (key, value) in conf}
     if len(meas_type) == 0 or meas_type[0].upper() not in meas_types:
-        # no calibration for x axis and labels are default ms and Natoms
-        return meas_type_default,x_lbl_default, y_lbl_default, lambda x: x
+        meas_type = [meas_type_default]
     elif meas_type[0].upper() == 'AS':
-        return as_measurement(conf_params,dirs,folder)
-    else:
-        return (meas_type[0].upper(),*meas_types[meas_type[0].upper()](conf_params))
+        as_folder = as_measurement(dirs,folder)
+        if as_folder is not None:
+            meas_type[0],conf_prms = get_configuration_parameters(as_folder,dirs)
+#             prms = re.findall('(\w+)=(\S+)+', as_folder)
+#             conf_prms = {key.upper():value for (key, value) in prms}
+            for (key, value) in conf_params.items():
+                conf_prms[key]=value
+            conf_params = conf_prms
+    return meas_type[0].upper(),conf_params
+            
+    
 
 
 # In[ ]:
@@ -731,6 +764,47 @@ def get_pandas_table(navrD):
                 dd = tbl
             else:
                 dd = dd.append(tbl,ignore_index=True)
+    # dd = dd.set_index(['type','time'])
+    return dd
+
+
+# In[ ]:
+
+def get_pandas_table2(navrD):
+    '''this version of program differs by first creating all table, and then assigning data, can potentially cause error 
+    due to miss of some row'''
+    import pandas as pd
+    # helper function for index egneration for table
+    def gen_indexs(keys):
+        tpls = []
+        tr_table = {'fit1D':['N','x0','sigma','bgnd'], 
+                    'fit2D':['N','y0','x0','sigma_y','sigma_x','bgnd'],
+                    'center_pos':['x','y']}
+        for key in keys:
+            if key.startswith('image'):
+                continue
+            desc = ['']
+            for tkey in tr_table:
+                if key.startswith(tkey):
+                    desc = tr_table[tkey]
+                    break
+            tpls.extend([(key, name) for name in desc])
+        return tpls
+    dd = None
+    for i,time in enumerate(sorted(navrD.keys())):
+        for j,meas_type in enumerate(navrD[time]):
+            N_shots = len(navrD[time])
+            if dd is None:
+                keys = list(navrD[time][meas_type])
+                tpls = [('folder',''),('type',''),*gen_indexs(keys)]
+                cols = pd.MultiIndex.from_tuples(tpls)
+                dd = pd.DataFrame(zeros((len(navrD)*N_shots,len(tpls))),columns=cols)
+            dd.loc[i*N_shots + j,'folder'] = time
+            dd.loc[i*N_shots + j,'type'] = meas_type
+            for key in keys:
+                if key.startswith('image'):
+                    continue
+                dd.loc[i*N_shots + j,key] = navrD[time][meas_type][key]
     # dd = dd.set_index(['type','time'])
     return dd
 
