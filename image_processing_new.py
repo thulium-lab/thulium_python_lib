@@ -4,8 +4,10 @@
 # In[ ]:
 
 """
-Last modified 08.02.2016
+Last modified 27.04.2016
 This is file for instruments in image proseccing functionality.
+Last changes:
+fixed get_pandas_table2(navrD)
 NOTES:
 1. In Avr_Image.avr_image if 2D fit is not found, this avr_image is treated as bad and throwed away and all individual
 images are treated as bad. This can be changed if needed
@@ -786,18 +788,19 @@ def get_pandas_table2(navrD):
         return tpls
     dd = None
     for i,time in enumerate(sorted(navrD.keys())):
-        for meas_type in navrD[time]:
+        for j,meas_type in enumerate(navrD[time]):
+            N_shots = len(navrD[time])
             if dd is None:
                 keys = list(navrD[time][meas_type])
                 tpls = [('folder',''),('type',''),*gen_indexs(keys)]
                 cols = pd.MultiIndex.from_tuples(tpls)
-                dd = pd.DataFrame(zeros((len(navrD),len(tpls))),columns=cols)
-            dd.loc[i,'folder'] = time
-            dd.loc[i,'type'] = meas_type
+                dd = pd.DataFrame(zeros((len(navrD)*N_shots,len(tpls))),columns=cols)
+            dd.loc[i*N_shots + j,'folder'] = time
+            dd.loc[i*N_shots + j,'type'] = meas_type
             for key in keys:
                 if key.startswith('image'):
                     continue
-                dd.loc[i,key] = navrD[time][meas_type][key]
+                dd.loc[i*N_shots + j,key] = navrD[time][meas_type][key]
     # dd = dd.set_index(['type','time'])
     return dd
 
