@@ -25,7 +25,7 @@ import re
 import json
 
 
-# In[2]:
+# In[4]:
 
 #class for encoding numpy array to json
 class JsonCustomEncoder(json.JSONEncoder):
@@ -44,7 +44,7 @@ class JsonCustomEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
-# In[3]:
+# In[5]:
 
 # removed coeffitioent 2 in gaussian functions in exponents
 def gaussian(x,N,x0,sigma, background):
