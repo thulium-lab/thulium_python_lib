@@ -145,8 +145,8 @@ class Load_Image():
         from re import findall
         data = Image_Basics(imread(image_url),image_url)
         dr,fl = dr,fr = os.path.split(image_url)
-        data.folderN = float(re.findall(r"[-+]?\d*\.\d+|\d+",dr)[-1])
-        nbrs = re.findall(r"[-+]?\d*\.\d+|\d+",fl)
+        data.folderN = float(re.findall(r"[-+]?\d*\.?\d+",dr)[-1])
+        nbrs = re.findall(r"[-+]?\d*\.?\d+",fl)
         data.shotN, data.shot_typeN = map(float,nbrs if len(nbrs)==2 else (nbrs[0],'1'))
 #         (data.folderN, data.shotN, data.shot_typeN) = map(float, findall(r"[-+]?\d*\.\d+|\d+", image_url)[-3:])
         
@@ -216,7 +216,8 @@ def rearrange_data(all_data,sift_by_isgood=True):
 class Avr_Image():
     """ Class for average data, has all attributes as Load_Image
         """
-    def __init__(self, dview=None, do_fit1D_x=True, do_fit1D_y=True, do_fit2D=True, do_filtering=False, do_sifting=True,conf_int=0.2):
+    def __init__(self, dview=None, do_fit1D_x=True, do_fit1D_y=True, do_fit2D=True, 
+                 do_filtering=False, do_sifting=True,conf_int=0.2,n_sigmas=2):
         from scipy.ndimage import gaussian_filter#, median_filter
         self.do_fit1D_x = do_fit1D_x
         self.do_fit1D_y = do_fit1D_y
@@ -226,6 +227,7 @@ class Avr_Image():
         self.filter_function = gaussian_filter
         self.filter_param = 1 # for gaussian filtering
         self.conf_int = conf_int
+        self.n_sigmas = n_sigmas
         dview['averager']=self
     def check_image(self,avr_image, image): 
         # new version - check if image is good is based on information from x and y coordinates from 1D fits
@@ -275,6 +277,9 @@ class Avr_Image():
                         data.fit1D_y = data.fit_gaussian1D(1)
                     if self.do_fit2D:
                         data.fit2D = data.fit_gaussian2D()
+                    if self.do_fit1D_x and self.do_fit1D_y:
+                        data.total_small = sum(data.image[data.fit1D_y[1]-self.n_sigmas*data.fit1D_y[2]:data.fit1D_y[1]+self.n_sigmas*data.fit1D_y[2],
+                                                 data.fit1D_x[1]-self.n_sigmas*data.fit1D_x[2]:data.fit1D_x[1]+self.n_sigmas*data.fit1D_x[2]])
                 except RuntimeError:
                     print("RuntimeError, couldn't find fit for image", data.image_url)
                     data.isgood = False
@@ -303,6 +308,9 @@ class Avr_Image():
             if hasattr(image_list[0],'fit2D'):
                 data.fit2D_mean = mean([d.fit2D for d in image_list],0)
                 data.fit2D_std = std([d.fit2D for d in image_list],0)
+            if hasattr(image_list[0],'total_small'):
+                data.tatal_small_mean = mean([d.total_small for d in image_list],0)
+                data.total_small_std = std([d.total_small for d in image_list],0)
         return (data.isgood, folderN, shot_typeN, data, bad_images)  
     def __call__(self, dataD, lview):
         """ Construct average image
